@@ -1,0 +1,64 @@
+# [TODO]: Have to github workflow to auto deploy application on EC2
+
+services:
+  # Backend service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: node_backend
+    restart: always
+    env_file:
+      - .env
+    expose:
+      - "5000"
+
+  # MongoDB Service
+  mongo:
+    image: mongo:6
+    container_name: mongo_db
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+
+  nginx:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: nginx_proxy
+    depends_on:
+      - backend
+      - certbot
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/entrypoint.sh:/entrypoint.sh:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - certbot_certs:/etc/letsencrypt
+      - certbot_challenges:/var/www/certbot
+    env_file:
+      - .env
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    restart: always
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot_ssl
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_challenges:/var/www/certbot
+      - ./certbot/init.sh:/init.sh:ro
+    env_file:
+      - .env
+    entrypoint: ["/bin/sh", "/init.sh"]
+    restart: always
+
+volumes:
+  certbot_certs:
+  certbot_challenges:
+  mongo_data:
